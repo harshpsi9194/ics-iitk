@@ -168,6 +168,7 @@ export const removeSongFromPlaylist = async (songId: string) => {
 // Spotify search function
 export const searchSpotifyTracks = async (query: string) => {
   try {
+    console.log('Searching for tracks:', query)
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spotify-search?q=${encodeURIComponent(query)}`,
       {
@@ -179,13 +180,19 @@ export const searchSpotifyTracks = async (query: string) => {
     )
     
     if (!response.ok) {
-      throw new Error('Failed to search Spotify')
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      console.error('Spotify search failed:', response.status, errorData)
+      throw new Error(errorData.error || `HTTP ${response.status}: Failed to search Spotify`)
     }
     
     const data = await response.json()
+    console.log('Search successful, found tracks:', data.tracks?.length || 0)
     return { data: data.tracks, error: null }
   } catch (error) {
     console.error('Error searching Spotify:', error)
-    return { data: null, error }
+    return { 
+      data: null, 
+      error: error instanceof Error ? error.message : 'Failed to search Spotify'
+    }
   }
 }

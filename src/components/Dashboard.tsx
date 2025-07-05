@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { StarIcon, LogOutIcon, BookOpenIcon, X, ExternalLink, Loader2 } from 'lucide-react';
+import { StarIcon, LogOutIcon, BookOpenIcon, X, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarSeparator } from '@/components/ui/sidebar';
 import { 
   getCurrentUser, 
@@ -33,6 +33,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [hobbiesLoading, setHobbiesLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -109,25 +110,40 @@ const Dashboard = () => {
 
   const handleSongSearch = async (value: string) => {
     setCurrentSong(value);
+    setSearchError(null);
+    
     if (value.length > 2) {
       setSearchLoading(true);
       try {
         const { data: tracks, error } = await searchSpotifyTracks(value);
         if (error) {
-          throw error;
+          setSearchError(error);
+          if (error.includes('credentials') || error.includes('environment')) {
+            toast.error('Spotify search is not configured. Please contact the administrator.');
+          } else {
+            toast.error('Failed to search songs. Please try again.');
+          }
+          setSongSuggestions([]);
+          setShowSuggestions(false);
+        } else {
+          setSongSuggestions(tracks || []);
+          setShowSuggestions(true);
+          setSearchError(null);
         }
-        setSongSuggestions(tracks || []);
-        setShowSuggestions(true);
       } catch (error) {
         console.error('Error searching songs:', error);
-        toast.error('Failed to search songs');
+        const errorMessage = error instanceof Error ? error.message : 'Failed to search songs';
+        setSearchError(errorMessage);
+        toast.error('Failed to search songs. Please try again.');
         setSongSuggestions([]);
+        setShowSuggestions(false);
       } finally {
         setSearchLoading(false);
       }
     } else {
       setShowSuggestions(false);
       setSongSuggestions([]);
+      setSearchError(null);
     }
   };
 
@@ -152,6 +168,7 @@ const Dashboard = () => {
       
       setCurrentSong('');
       setShowSuggestions(false);
+      setSearchError(null);
       toast.success('Song added to playlist!');
     } catch (error) {
       console.error('Error adding song:', error);
@@ -373,8 +390,18 @@ const Dashboard = () => {
                           </div>
                         )}
                         
+                        {/* Search Error Display */}
+                        {searchError && (
+                          <div className="absolute top-full left-0 right-0 bg-red-500/90 text-white rounded-md shadow-lg mt-1 z-10 p-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <AlertCircle className="h-4 w-4" />
+                              <span>{searchError}</span>
+                            </div>
+                          </div>
+                        )}
+                        
                         {/* Song Suggestions */}
-                        {showSuggestions && songSuggestions.length > 0 && (
+                        {showSuggestions && songSuggestions.length > 0 && !searchError && (
                           <div className="absolute top-full left-0 right-0 bg-white rounded-md shadow-lg mt-1 z-10 max-h-40 overflow-y-auto">
                             {songSuggestions.map((song) => (
                               <button
